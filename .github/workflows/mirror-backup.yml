@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   mirror:
-    # يعمل في المستودع الرسمي فقط، ولا يعمل داخل المستودع الاحتياطي
+    # يعمل في المستودع الرسمي فقط
     if: github.repository == 'nimahh37-create/nafas-training-3m'
     runs-on: ubuntu-latest
     steps:
@@ -33,7 +33,23 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
-      - name: نسخ الفرع main إلى المستودع الاحتياطي
+      - name: تجهيز نسخة احتياطية من ملفات المنصة
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add backup git@github.com:nimahh37-create/nafas-sciences-platform.git
-          git push backup HEAD:main --force
+          git fetch backup main
+          git checkout -B mirror backup/main
+          git read-tree --reset -u "$GITHUB_SHA"
+          # ملفات الأتمتة لا تُنسخ إلى الاحتياطي (GitHub يمنع تحديثها بمفتاح نشر)
+          rm -rf .github
+          git add -A
+          if git diff --cached --quiet; then
+            echo "لا توجد تغييرات جديدة في ملفات المنصة"
+            exit 0
+          fi
+          git commit -m "مزامنة تلقائية من المستودع الرسمي — $GITHUB_SHA"
+
+      - name: دفع النسخة الاحتياطية
+        run: |
+          git push backup mirror:main --force
