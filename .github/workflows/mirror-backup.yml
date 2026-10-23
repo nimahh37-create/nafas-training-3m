@@ -1,0 +1,39 @@
+name: مزامنة المستودع الاحتياطي
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mirror-backup
+  cancel-in-progress: true
+
+jobs:
+  mirror:
+    # يعمل في المستودع الرسمي فقط، ولا يعمل داخل المستودع الاحتياطي
+    if: github.repository == 'nimahh37-create/nafas-training-3m'
+    runs-on: ubuntu-latest
+    steps:
+      - name: جلب المستودع الرسمي بكامل سجله
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: تجهيز مفتاح النشر
+        env:
+          SSH_KEY: ${{ secrets.BACKUP_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: نسخ الفرع main إلى المستودع الاحتياطي
+        run: |
+          git remote add backup git@github.com:nimahh37-create/nafas-sciences-platform.git
+          git push backup HEAD:main --force
